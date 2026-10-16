@@ -6,8 +6,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>AI Macro Analytics</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
   <style>
     :root {
       --bg: #0a0e14;
@@ -17,7 +15,6 @@
       --text: #e6edf3;
       --text-muted: #8b949e;
       --border: #30363d;
-      --danger: #ff5252;
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     body {
@@ -83,7 +80,7 @@
 
     .form-group { margin-bottom: 12px; position: relative; }
     label { font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px; }
-    input[type="text"], input[type="number"], select {
+    input[type="text"], input[type="number"] {
       width: 100%;
       background: #0d1117;
       border: 1px solid var(--border);
@@ -94,4 +91,447 @@
     }
     input:focus { border-color: var(--accent); outline: none; }
 
-    .multiplier-chips { display: flex
+    .multiplier-chips { display: flex; gap: 6px; margin-top: 6px; overflow-x: auto; }
+    .m-chip {
+      background: #161f2c;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+
+    .btn-main {
+      width: 100%;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .btn-sub {
+      width: 100%;
+      background: #21262d;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+
+    .suggestions-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #161b22;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      max-height: 150px;
+      overflow-y: auto;
+      z-index: 100;
+      display: none;
+    }
+    .suggestion-item { padding: 10px; border-bottom: 1px solid #21262d; font-size: 0.85rem; cursor: pointer; }
+
+    .log-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #1c2430;
+      font-size: 0.85rem;
+    }
+    .log-item-meta { font-size: 0.75rem; color: var(--text-muted); }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <div class="header">
+    <h1>AI MACRO ANALYTICS</h1>
+    <div class="date" id="currentDate">--/--/--</div>
+  </div>
+
+  <!-- AI 代謝ダッシュボード -->
+  <div class="card">
+    <div class="card-title">
+      <span>AI 代謝・目標アナリティクス</span>
+      <span style="font-size: 0.7rem; color: var(--accent);" id="aiConfidence">蓄積 0 日</span>
+    </div>
+    <div class="grid-2">
+      <div class="stat-box">
+        <div class="stat-label">推定 TDEE (消費)</div>
+        <div class="stat-val" id="tdeeDisplay">----</div>
+        <div class="stat-sub">kcal / 日</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">真の体重トレンド</div>
+        <div class="stat-val" id="trendWeightDisplay">--.-</div>
+        <div class="stat-sub">kg</div>
+      </div>
+    </div>
+
+    <label>目標モード</label>
+    <div class="btn-group">
+      <button class="btn-toggle active" onclick="setGoal('maintain', this)">現状維持</button>
+      <button class="btn-toggle" onclick="setGoal('cut', this)">減量 (-0.5kg/週)</button>
+      <button class="btn-toggle" onclick="setGoal('bulk', this)">増量 (+0.25kg/週)</button>
+    </div>
+    <div style="font-size: 0.85rem; text-align: center; color: var(--text-muted); margin-top: 4px;">
+      推奨摂取量: <strong id="recCals" style="color: var(--text);">----</strong> kcal (P:<span id="recP">--</span>g F:<span id="recF">--</span>g C:<span id="recC">--</span>g)
+    </div>
+  </div>
+
+  <!-- 本日の摂取状況 -->
+  <div class="card">
+    <div class="card-title">本日の摂取カロリー</div>
+    <div style="display: flex; justify-content: space-between; font-weight: 700;">
+      <span id="consumedCals">0 kcal</span>
+      <span id="targetCalsDisplay" style="color: var(--text-muted);">/ ---- kcal</span>
+    </div>
+    <div class="progress-bar-bg">
+      <div class="progress-bar" id="calsProgress"></div>
+    </div>
+    <div class="pfc-bars">
+      <span>P: <strong id="sumP">0</strong>g</span>
+      <span>F: <strong id="sumF">0</strong>g</span>
+      <span>C: <strong id="sumC">0</strong>g</span>
+    </div>
+  </div>
+
+  <!-- クイック固定食 -->
+  <div class="card">
+    <div class="card-title">クイック固定食（ワンタップ追加）</div>
+    <div class="presets-container" id="presetButtons"></div>
+  </div>
+
+  <!-- 食事・PFC記録 -->
+  <div class="card">
+    <div class="card-title">食事を記録</div>
+    <div class="form-group">
+      <label>食品名（候補検索）</label>
+      <input type="text" id="foodName" placeholder="例: 鶏むね肉、プロテイン" oninput="handleFoodSuggest(this.value)" autocomplete="off" />
+      <div class="suggestions-list" id="suggestList"></div>
+    </div>
+
+    <div class="form-group">
+      <label>倍率 (100g基準)</label>
+      <input type="number" id="servingMultiplier" step="0.1" value="1.0" oninput="applyMultiplier()" />
+      <div class="multiplier-chips">
+        <div class="m-chip" onclick="setMultiplier(0.5)">0.5x</div>
+        <div class="m-chip" onclick="setMultiplier(1.0)">1.0x</div>
+        <div class="m-chip" onclick="setMultiplier(1.5)">1.5x</div>
+        <div class="m-chip" onclick="setMultiplier(2.0)">2.0x</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="form-group"><label>たんぱく質 (P) g</label><input type="number" id="inputP" step="0.1" /></div>
+      <div class="form-group"><label>脂質 (F) g</label><input type="number" id="inputF" step="0.1" /></div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group"><label>炭水化物 (C) g</label><input type="number" id="inputC" step="0.1" /></div>
+      <div class="form-group"><label>カロリー (kcal)</label><input type="number" id="inputCal" /></div>
+    </div>
+
+    <button class="btn-main" onclick="addFoodRecord()">食事を記録に追加</button>
+  </div>
+
+  <!-- 本日のログ -->
+  <div class="card">
+    <div class="card-title">本日の食事ログ</div>
+    <div id="foodLogs"></div>
+  </div>
+
+  <!-- 体重記録 ＆ グラフ -->
+  <div class="card">
+    <div class="card-title">体重記録 ＆ 30日推移</div>
+    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+      <input type="number" id="inputWeight" step="0.1" placeholder="本日の体重 (kg)" />
+      <button class="btn-main" style="width: 120px; margin: 0;" onclick="saveWeight()">保存</button>
+    </div>
+    <div style="height: 200px;">
+      <canvas id="weightChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const FOOD_MASTER = [
+      { name: "鶏むね肉（皮なし100g）", p: 23.3, f: 1.9, c: 0, cal: 110 },
+      { name: "白米（並盛150g）", p: 3.8, f: 0.5, c: 55.7, cal: 234 },
+      { name: "ソイプロテイン（1食分）", p: 20.0, f: 1.0, c: 3.0, cal: 101 },
+      { name: "全卵（Mサイズ1個）", p: 6.2, f: 5.2, c: 0.2, cal: 76 },
+      { name: "納豆（1パック50g）", p: 8.3, f: 5.0, c: 6.1, cal: 100 },
+      { name: "オートミール（40g）", p: 5.5, f: 2.3, c: 27.7, cal: 152 }
+    ];
+
+    let baseP = 0, baseF = 0, baseC = 0, baseCal = 0;
+    let currentGoal = 'maintain';
+    let weightChart = null;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    document.getElementById('currentDate').textContent = todayStr;
+
+    function getStorage(key, defaultVal) {
+      try {
+        const data = localStorage.getItem(key);
+        return data ? JSON.parse(data) : defaultVal;
+      } catch(e) { return defaultVal; }
+    }
+    function setStorage(key, val) {
+      try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
+    }
+
+    function initPresets() {
+      const container = document.getElementById('presetButtons');
+      container.innerHTML = '';
+      FOOD_MASTER.slice(0, 4).forEach(p => {
+        const btn = document.createElement('button');
+        btn.className = 'btn-chip';
+        btn.textContent = `+ ${p.name}`;
+        btn.onclick = () => recordDirect(p.name, p.p, p.f, p.c, p.cal);
+        container.appendChild(btn);
+      });
+    }
+
+    function handleFoodSuggest(val) {
+      const list = document.getElementById('suggestList');
+      if (!val) { list.style.display = 'none'; return; }
+      const matches = FOOD_MASTER.filter(f => f.name.includes(val));
+      if (matches.length === 0) { list.style.display = 'none'; return; }
+
+      list.innerHTML = '';
+      matches.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'suggestion-item';
+        div.textContent = `${item.name} (${item.cal}kcal)`;
+        div.onclick = () => selectMasterFood(item);
+        list.appendChild(div);
+      });
+      list.style.display = 'block';
+    }
+
+    function selectMasterFood(item) {
+      document.getElementById('foodName').value = item.name;
+      baseP = item.p; baseF = item.f; baseC = item.c; baseCal = item.cal;
+      document.getElementById('suggestList').style.display = 'none';
+      document.getElementById('servingMultiplier').value = '1.0';
+      applyMultiplier();
+    }
+
+    function setMultiplier(val) {
+      document.getElementById('servingMultiplier').value = val;
+      applyMultiplier();
+    }
+
+    function applyMultiplier() {
+      const m = parseFloat(document.getElementById('servingMultiplier').value) || 1.0;
+      if (baseCal > 0 || baseP > 0) {
+        document.getElementById('inputP').value = (baseP * m).toFixed(1);
+        document.getElementById('inputF').value = (baseF * m).toFixed(1);
+        document.getElementById('inputC').value = (baseC * m).toFixed(1);
+        document.getElementById('inputCal').value = Math.round(baseCal * m);
+      }
+    }
+
+    function addFoodRecord() {
+      const name = document.getElementById('foodName').value || '食事';
+      const p = parseFloat(document.getElementById('inputP').value) || 0;
+      const f = parseFloat(document.getElementById('inputF').value) || 0;
+      const c = parseFloat(document.getElementById('inputC').value) || 0;
+      let cal = parseInt(document.getElementById('inputCal').value);
+      if (isNaN(cal) || cal === 0) cal = Math.round(p * 4 + f * 9 + c * 4);
+
+      recordDirect(name, p, f, c, cal);
+
+      document.getElementById('foodName').value = '';
+      document.getElementById('inputP').value = '';
+      document.getElementById('inputF').value = '';
+      document.getElementById('inputC').value = '';
+      document.getElementById('inputCal').value = '';
+      baseP = baseF = baseC = baseCal = 0;
+    }
+
+    function recordDirect(name, p, f, c, cal) {
+      const logs = getStorage('foodLogs', []);
+      logs.push({ date: todayStr, name, p, f, c, cal, time: new Date().toLocaleTimeString().slice(0,5) });
+      setStorage('foodLogs', logs);
+      updateUI();
+    }
+
+    function saveWeight() {
+      const w = parseFloat(document.getElementById('inputWeight').value);
+      if (!w) return;
+      const weights = getStorage('weights', {});
+      weights[todayStr] = w;
+      setStorage('weights', weights);
+      alert('体重を記録しました');
+      updateUI();
+    }
+
+    function runAIAnalytics() {
+      const weights = getStorage('weights', {});
+      const logs = getStorage('foodLogs', []);
+
+      const dates = [];
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        dates.push(d.toISOString().split('T')[0]);
+      }
+
+      let currentTrend = null;
+      const alpha = 0.1;
+      const trendHistory = {};
+
+      dates.forEach(date => {
+        if (weights[date]) {
+          if (currentTrend === null) currentTrend = weights[date];
+          else currentTrend = (alpha * weights[date]) + ((1 - alpha) * currentTrend);
+        }
+        if (currentTrend !== null) trendHistory[date] = currentTrend;
+      });
+
+      const recordedDays = Object.keys(weights).length;
+      document.getElementById('aiConfidence').textContent = `蓄積 ${recordedDays} 日分`;
+
+      const latestTrend = currentTrend || (weights[todayStr] || 65.0);
+      document.getElementById('trendWeightDisplay').textContent = Number(latestTrend).toFixed(1);
+
+      let estimatedTDEE = 2200;
+      if (recordedDays >= 7) {
+        const pastLogs = logs.filter(l => dates.includes(l.date));
+        const totalCals = pastLogs.reduce((acc, cur) => acc + cur.cal, 0);
+        const avgIntake = pastLogs.length > 0 ? (totalCals / dates.filter(d => logs.some(l => l.date === d)).length || 1) : 2200;
+
+        const firstDate = dates.find(d => trendHistory[d] !== undefined);
+        const lastDate = dates.slice().reverse().find(d => trendHistory[d] !== undefined);
+
+        if (firstDate && lastDate && firstDate !== lastDate) {
+          const deltaW = trendHistory[lastDate] - trendHistory[firstDate];
+          const daysSpan = (new Date(lastDate) - new Date(firstDate)) / (1000 * 60 * 60 * 24);
+          if (daysSpan >= 5) {
+            const dailyDeficitOrSurplus = (deltaW * 7700) / daysSpan;
+            estimatedTDEE = Math.round(avgIntake - dailyDeficitOrSurplus);
+          }
+        }
+      }
+      document.getElementById('tdeeDisplay').textContent = estimatedTDEE.toLocaleString();
+
+      let targetCals = estimatedTDEE;
+      if (currentGoal === 'cut') targetCals -= 500;
+      if (currentGoal === 'bulk') targetCals += 250;
+
+      const targetP = Math.round(latestTrend * 2.0);
+      const targetF = Math.round((targetCals * 0.22) / 9);
+      const targetC = Math.round((targetCals - (targetP * 4 + targetF * 9)) / 4);
+
+      document.getElementById('recCals').textContent = targetCals.toLocaleString();
+      document.getElementById('recP').textContent = targetP;
+      document.getElementById('recF').textContent = targetF;
+      document.getElementById('recC').textContent = targetC;
+      document.getElementById('targetCalsDisplay').textContent = `/ ${targetCals} kcal`;
+
+      renderChart(dates, weights, trendHistory);
+      return targetCals;
+    }
+
+    function setGoal(goal, btn) {
+      currentGoal = goal;
+      document.querySelectorAll('.btn-toggle').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      updateUI();
+    }
+
+    function renderChart(dates, weights, trends) {
+      if (typeof Chart === 'undefined') return;
+      const ctx = document.getElementById('weightChart').getContext('2d');
+      const labels = dates.map(d => d.slice(5));
+      const weightData = dates.map(d => weights[d] || null);
+      const trendData = dates.map(d => trends[d] ? Number(trends[d]).toFixed(1) : null);
+
+      if (weightChart) weightChart.destroy();
+      weightChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: '実測 (kg)',
+              data: weightData,
+              borderColor: 'rgba(0, 176, 255, 0.4)',
+              borderDash: [4, 4],
+              pointRadius: 2,
+              spanGaps: true
+            },
+            {
+              label: 'トレンド (kg)',
+              data: trendData,
+              borderColor: '#00e676',
+              borderWidth: 2,
+              pointRadius: 0,
+              tension: 0.2,
+              spanGaps: true
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { grid: { color: '#21262d' } },
+            y: { grid: { color: '#21262d' } }
+          },
+          plugins: {
+            legend: { labels: { color: '#8b949e', font: { size: 10 } } }
+          }
+        }
+      });
+    }
+
+    function updateUI() {
+      const logs = getStorage('foodLogs', []).filter(l => l.date === todayStr);
+      let sumP = 0, sumF = 0, sumC = 0, sumCal = 0;
+
+      const logList = document.getElementById('foodLogs');
+      logList.innerHTML = '';
+
+      logs.forEach(item => {
+        sumP += item.p; sumF += item.f; sumC += item.c; sumCal += item.cal;
+        const div = document.createElement('div');
+        div.className = 'log-item';
+        div.innerHTML = `
+          <div>
+            <strong>${item.name}</strong>
+            <div class="log-item-meta">${item.time} | P:${item.p}g F:${item.f}g C:${item.c}g</div>
+          </div>
+          <div><strong>${item.cal}</strong> kcal</div>
+        `;
+        logList.appendChild(div);
+      });
+
+      document.getElementById('sumP').textContent = sumP.toFixed(1);
+      document.getElementById('sumF').textContent = sumF.toFixed(1);
+      document.getElementById('sumC').textContent = sumC.toFixed(1);
+      document.getElementById('consumedCals').textContent = `${sumCal.toLocaleString()} kcal`;
+
+      const targetCals = runAIAnalytics();
+      const pct = Math.min(100, Math.round((sumCal / targetCals) * 100)) || 0;
+      document.getElementById('calsProgress').style.width = `${pct}%`;
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initPresets();
+      updateUI();
+    });
+  </script>
+</body>
+</html>
